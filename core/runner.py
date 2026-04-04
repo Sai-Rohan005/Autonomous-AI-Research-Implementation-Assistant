@@ -10,7 +10,7 @@ def run_agents(query):
 
     manager = ManagerTool()
     flow = manager._run(query)
-
+    print(flow)
     result = {}
 
     if "search" in flow:
