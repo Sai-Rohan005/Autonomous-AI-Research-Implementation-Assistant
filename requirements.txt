@@ -1,0 +1,25 @@
+# ---------------- Core Framework ----------------
+crewai
+
+# ---------------- UI ----------------
+streamlit
+
+# ---------------- HTTP Requests ----------------
+requests
+
+# ---------------- Environment Variables ----------------
+python-dotenv
+
+
+# ---------------- Optional (Better performance/logging) ----------------
+tqdm
+
+google-genai
+
+google-generativeai
+
+google-search-results
+
+duckduckgo-search
+
+crewai-tools

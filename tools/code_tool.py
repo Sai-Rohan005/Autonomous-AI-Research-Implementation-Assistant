@@ -1,35 +1,44 @@
-def code_tool(query):
-    prompt = (
-        f"Generate clean, well-structured Python code for the following task:\n{query}\n\n"
-        "Requirements:\n"
-        "- Code should be readable\n"
-        "- Include comments\n"
-        "- Follow best practices\n"
-    )
+from utils.llm import generate_text,generate_text_fallback
+from crewai.tools import BaseTool
+from utils.llm import generate_text
 
-    try:
-        result = code_llm(prompt)
+class CodeTool(BaseTool):
+    name: str = "Code Genrator Tool"
+    description: str = "Generate high-quality code for the given query."
 
-        return {
-            "status": "ok",
-            "code": result
-        }
-
-    except Exception as e:
-        print("Primary LLM Failed:", e)
+    def _run(self, data: str):
+        prompt = (
+                f"Generate clean, well-structured Python code for the following task:\n{data}\n\n"
+                "Requirements:\n"
+                "- Code should be readable\n"
+                "- Include comments\n"
+                "- Follow best practices\n"
+            )
 
         try:
-            result_second = code_llm2(prompt)
+            result = generate_text(prompt)
 
             return {
                 "status": "ok",
-                "code": result_second
+                "code": result             
             }
 
         except Exception as e:
-            print("Secondary LLM Failed:", e)
+                print("Primary LLM Failed:", e)
 
-            return {
-                "status": "error",
-                "code": ""
-            }
+                try:
+                    result_second = generate_text_fallback(prompt)
+
+                    return {
+                        "status": "ok",
+                        "code": result_second
+                    }
+
+                except Exception as e:
+                    print("Secondary LLM Failed:", e)
+
+                    return {
+                        "status": "error",
+                        "code": ""
+                    }
+
