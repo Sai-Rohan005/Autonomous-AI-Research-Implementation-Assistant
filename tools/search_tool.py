@@ -1,6 +1,7 @@
 from crewai.tools import BaseTool
 from duckduckgo_search import DDGS
 from utils.llm import generate_text
+import time
 
 class SearchTool(BaseTool):
     name: str = "Search Tool"
@@ -21,22 +22,37 @@ class SearchTool(BaseTool):
                         "link": r.get("href", "")
                     })
 
-        except Exception as ddg_error:
-            print("DDG Internal Error:", ddg_error)
+            if not results:
+                raise Exception("No results")
+
+            return results
+
+        except Exception as e:
+            print("Search Error:", e)
+
+            # 🔥 WAIT + RETRY
+            time.sleep(2)
+
             try:
-                fallback = generate_text(f"Explain {query}")
-                print("After DDG Fallback\n",fallback)
-                return [{
-                    "title": "Fallback",
-                    "snippet": fallback,
-                    "link": ""
-                }]
-            except Exception as e:
-                print("Fallback Error:", e)
-                return [{
-                    "title": "Error",
-                    "snippet": "Unable to fetch results",
-                    "link": ""
-                }]
+                with DDGS() as ddgs:
+                    results = list(ddgs.text(refined_query, max_results=3))
+                    return results
+            except:
+                print("DDG Internal Error:")
+                try:
+                    fallback = generate_text(f"Explain {query}")
+                    print("After DDG Fallback\n",fallback)
+                    return [{
+                        "title": "Fallback",
+                        "snippet": fallback,
+                        "link": ""
+                    }]
+                except Exception as e:
+                    print("Fallback Error:", e)
+                    return [{
+                        "title": "Error",
+                        "snippet": "Unable to fetch results",
+                        "link": ""
+                    }]
 
         return results

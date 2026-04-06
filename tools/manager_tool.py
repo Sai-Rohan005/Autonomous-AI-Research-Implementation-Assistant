@@ -1,70 +1,85 @@
 from crewai.tools import BaseTool
 from utils.llm import generate_text
-import json
 
 class ManagerTool(BaseTool):
     name: str = "Manager Tool"
-    description: str = "Decides which agents to call based on user query"
+    description: str = "Decides next action using ReAct reasoning"
 
-    def _run(self, query: str):
+    def _run(self, context: str):
+        """
+        context = {
+            "query": "...",
+            "history": [...],
+            "result": {...}
+        }
+        """
+
         prompt = f"""
-You are a precise AI workflow router. Your job is to decide the minimal set of agents needed. 
+You are an intelligent AI agent using ReAct reasoning.
 
-When the query is clear and the main LLM can handle it well using its built-in knowledge, return []. 
-When the query is unclear, ambiguous, confusing, or the router cannot confidently understand what the user wants, return ["search"] as a safe fallback.
+Your task is to decide the NEXT BEST ACTION step-by-step.
 
-### Available Agents and When to Use Them:
+⚠️ IMPORTANT:
+- You MUST choose ONLY ONE action at a time
+- You are NOT allowed to plan multiple steps
+- You must act based on the USER INTENT
 
-- **search**    → Use for:
-  - Any real-time, current, or up-to-date information (prices, news, weather, rankings, etc.)
-  - Queries that require external or latest facts
-  - When the query is ambiguous, unclear, or you cannot confidently interpret what the user is asking → use this as fallback
+---
 
-- **summarize** → Use ONLY if the user explicitly asks to summarize, condense, or make a summary of some content.
+### 🔍 First: Understand the USER INTENT
 
-- **code**      → Use ONLY if the user asks to write, generate, implement, debug, or show code.
+Classify the query into ONE of these:
 
-- **compare**   → Use ONLY if the query explicitly asks to compare two or more things (contains "compare", "vs", "versus", "difference between", "which is better", etc.).
-                 Never use for explaining a single concept.
+1. EXPLANATION → (e.g., "What is...", "Explain...", "Tell me about...")
+2. REAL-TIME / FACTUAL → (e.g., price, news, current data)
+3. CODE REQUEST → (e.g., "write code", "implement", "program")
+4. COMPARISON → (e.g., "compare", "difference between", "vs")
+5. SUMMARIZATION → (e.g., "summarize this text")
+6. REPORT → (e.g., "generate report")
 
-- **report**    → Use ONLY if the user asks for a "report", "detailed report", "structured report", or final polished output combining multiple steps.
+---
 
-### Strict Decision Rules:
-- If the query is a clear, single-topic explanation ("Explain...", "What is...", "Tell me about...") → return [] 
-- If the query is ambiguous, vague, poorly worded, or you are unsure what the user wants → return ["search"]
-- Be minimal when the intent is obvious. Use "search" as fallback when interpretation fails.
-- Return agents in logical order.
+### 🎯 Action Mapping Rules
 
-### Examples:
+- If EXPLANATION → finish  ✅ (LLM can answer directly)
+- If REAL-TIME → search
+- If CODE REQUEST → code
+- If COMPARISON → compare
+- If SUMMARIZATION → summarize
+- If REPORT → report
 
-Query: "Compare Transformer and RNN"
-Output: ["compare"]
+---
 
-Query: "What is the current gold price in Hyderabad?"
-Output: ["search"]
+### 🚫 STRICT RESTRICTIONS
 
-Query: "Write quicksort code in Python"
-Output: ["code"]
+- DO NOT use "code" unless user explicitly asks for code
+- DO NOT use "search" for general knowledge (LLM already knows)
+- DO NOT overuse tools
+- DO NOT repeat actions
+- If enough information is available → finish
 
-Query: "blablabla what is this thing??"
-Output: ["search"]     # ambiguous → fallback to search
+---
 
-Query: "latest news about AI"
-Output: ["search"]
+### 🧠 Context:
+{context}
 
-Query: "Compare RNN and LSTM and make a report"
-Output: ["compare", "report"]
+---
 
-Query: "idk what you mean by this"
-Output: ["search"]
+### ✅ Output Format:
+Return ONLY ONE word from:
+search / summarize / code / compare / report / finish
 
-Now analyze the query below. Return **ONLY** a valid JSON array. No explanations, no extra text.
-
-Query: {query}
+NO explanation.
 """
+
         response = generate_text(prompt)
 
-        try:
-            return json.loads(response)
-        except:
-            return ["search"]  # fallback
+        # Clean output
+        action = response.strip().lower()
+
+        valid_actions = ["search", "summarize", "code", "compare", "report", "finish"]
+
+        if action in valid_actions:
+            return action
+
+        return "finish"  # safe fallback

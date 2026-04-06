@@ -5,27 +5,66 @@ from tools.code_tool import CodeTool
 from tools.compare_tool import CompareTool
 from tools.report_tool import ReportTool
 
-
 def run_agents(query):
 
     manager = ManagerTool()
-    flow = manager._run(query)
-    print(flow)
-    result = {}
 
-    if "search" in flow:
-        result["search"] = SearchTool()._run(query)
+    context = {
+        "query": query,
+        "history": [],
+        "result": {}
+    }
 
-    if "summarize" in flow:
-        result["summary"] = SummarizeTool()._run(str(result))
+    max_steps = 5
 
-    if "code" in flow:
-        result["code"] = CodeTool()._run(query)
+    for step in range(max_steps):
 
-    if "compare" in flow:
-        result["comparison"] = CompareTool()._run(query)
+        # -------- THINK --------
+        thought = manager._run(str(context))
 
-    if "report" in flow:
-        result["report"] = ReportTool()._run(result)
+        print(f"\nStep {step+1} Thought:", thought)
 
-    return result
+        # -------- STOP CONDITION --------
+        if "finish" in thought:
+            break
+
+        # -------- ACTION --------
+        action = None
+
+        if "search" in thought:
+            observation = SearchTool()._run(query)
+            context["result"]["search"] = observation
+            action = "search"
+
+        elif "summarize" in thought:
+            observation = SummarizeTool()._run(str(context["result"]))
+            context["result"]["summary"] = observation
+            action = "summarize"
+
+        elif "code" in thought:
+            observation = CodeTool()._run(query)
+            context["result"]["code"] = observation
+            action = "code"
+
+        elif "compare" in thought:
+            observation = CompareTool()._run(query)
+            context["result"]["comparison"] = observation
+            action = "compare"
+
+        elif "report" in thought:
+            observation = ReportTool()._run(context["result"])
+            context["result"]["report"] = observation
+            action = "report"
+
+        else:
+            print("No valid action → stopping")
+            break
+
+        # -------- OBSERVATION --------
+        context["history"].append({
+            "thought": thought,
+            "action": action,
+            "observation": str(observation)[:200]
+        })
+
+    return context["result"]
