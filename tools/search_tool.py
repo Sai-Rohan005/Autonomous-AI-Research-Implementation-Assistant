@@ -25,7 +25,10 @@ class SearchTool(BaseTool):
             if not results:
                 raise Exception("No results")
 
-            return results
+            return {
+                "status":"ok", 
+                "search":results
+                }
 
         except Exception as e:
             print("Search Error:", e)
@@ -36,7 +39,10 @@ class SearchTool(BaseTool):
             try:
                 with DDGS() as ddgs:
                     results = list(ddgs.text(refined_query, max_results=3))
-                    return results
+                    return {
+                        "status":"ok", 
+                        "search":results
+                        }
             except:
                 print("DDG Internal Error:")
                 try:
@@ -55,4 +61,7 @@ class SearchTool(BaseTool):
                         "link": ""
                     }]
 
-        return results
+        return {
+                "status":"ok", 
+                "search":results
+                }

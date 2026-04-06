@@ -27,7 +27,7 @@ class SummarizeTool(BaseTool):
     "- Output **only** the summary\n"
     "- Do not use phrases like 'Summary:', 'Here is a summary of...', or any meta-commentary\n"
     "- Start directly with the content\n"
-    "- Aim for the perfect balance between brevity and completeness"
+    "- Aim for the perfect balance between brevity and completeness" 
 )
         try:
             result = generate_text(prompt)

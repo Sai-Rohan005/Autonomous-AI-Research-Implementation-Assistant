@@ -12,20 +12,24 @@ def run_agents(query):
     context = {
         "query": query,
         "history": [],
-        "result": {}
+        "result": {},
+        "status":"ok"
     }
 
     max_steps = 5
 
     for step in range(max_steps):
+        last_obs = context["history"][-1] if context["history"] else None
 
         # -------- THINK --------
-        thought = manager._run(str(context))
+        thought = manager._run(str(context),str(last_obs))
 
         print(f"\nStep {step+1} Thought:", thought)
 
         # -------- STOP CONDITION --------
         if "finish" in thought:
+            break
+        if len(context["history"]) > 0 and thought == context["history"][-1]["action"]:
             break
 
         # -------- ACTION --------
@@ -62,9 +66,10 @@ def run_agents(query):
 
         # -------- OBSERVATION --------
         context["history"].append({
-            "thought": thought,
+            "step": step,
             "action": action,
-            "observation": str(observation)[:200]
+            "observation": observation,
+            "status":observation["status"]
         })
 
     return context["result"]

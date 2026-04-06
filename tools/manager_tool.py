@@ -5,12 +5,13 @@ class ManagerTool(BaseTool):
     name: str = "Manager Tool"
     description: str = "Decides next action using ReAct reasoning"
 
-    def _run(self, context: str):
+    def _run(self, context: str,last_obs :str):
         """
         context = {
             "query": "...",
             "history": [...],
-            "result": {...}
+            "result": {...},
+            "status":"..."
         }
         """
 
@@ -59,11 +60,17 @@ Classify the query into ONE of these:
 - If enough information is available → finish
 
 ---
+Before choosing action:
+- Analyze previous observations
+- Check if enough information exists
+- Avoid repeating failed actions
 
 ### 🧠 Context:
 {context}
 
 ---
+### Previous Observation :
+{last_obs}
 
 ### ✅ Output Format:
 Return ONLY ONE word from:
