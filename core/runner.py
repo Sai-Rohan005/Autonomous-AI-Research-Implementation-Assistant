@@ -88,4 +88,16 @@ def run_agents(query):
         except Exception as e:
             print("Error in ReAct Loop: ",e)
 
-    return  generate_text(f"Answer the user query using this context:\n{context}")
+    return  generate_text(f"""
+Answer the user query clearly.
+
+Use:
+- Summary if available
+- Code if relevant
+- Comparison if useful
+
+Be structured and clear.
+
+Context:
+{context}
+""")
