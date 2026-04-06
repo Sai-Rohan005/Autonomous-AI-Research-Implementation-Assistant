@@ -1,82 +1,127 @@
 import streamlit as st
 from core.runner import run_agents
+import json
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="AI Research Assistant", layout="wide")
 
-st.title("🤖 AI Research & Implementation Assistant")
+st.title("🤖 Autonomous AI Research Assistant")
+st.caption("Powered by ReAct Agent Architecture")
+
+# ---------------- SESSION STATE ----------------
+if "running" not in st.session_state:
+    st.session_state.running = False
 
 # ---------------- INPUT ----------------
-query = st.text_input("Enter your query:")
+query = st.text_input("🔍 Enter your query:")
 
 # ---------------- BUTTON ----------------
-if st.button("Run Agent"):
+run_clicked = st.button(
+    "🚀 Run Agent",
+    disabled=st.session_state.running
+)
+
+# ---------------- EXECUTION ----------------
+if run_clicked:
 
     if not query:
         st.warning("Please enter a query")
 
     else:
-        with st.spinner("Processing..."):
+        st.session_state.running = True
+
+        with st.spinner("🤖 Agent is thinking..."):
             result = run_agents(query)
 
-        st.success("Done!")
+        st.session_state.running = False
 
-        # ---------------- DEBUG (OPTIONAL) ----------------
-        with st.expander("🔍 Debug Output"):
-            st.json(result)
+        st.success("✅ Completed!")
 
-        # ---------------- SEARCH RESULTS ----------------
-        if "search" in result:
-            st.subheader("🔍 Search Results")
+        # ---------------- FINAL ANSWER ----------------
+        if isinstance(result, dict) and result.get("final_answer"):
+            st.subheader("🎯 Final Answer")
+            st.write(result["final_answer"])
+            st.divider()
 
-            if isinstance(result["search"], list):
-                for item in result["search"]:
-                    st.write(f"**{item.get('title', '')}**")
-                    st.write(item.get("snippet", ""))
-                    if item.get("link"):
-                        st.write(f"[Read more]({item.get('link')})")
-                    st.write("---")
-
-        # ---------------- SUMMARY ----------------
-        if "summary" in result:
-            st.subheader("🧾 Summary")
-
-            summary = result["summary"]
-            if isinstance(summary, dict):
-                st.write(summary.get("summary", ""))
-            else:
-                st.write(summary)
-
-        # ---------------- CODE ----------------
-        if "code" in result:
-            st.subheader("💻 Code")
-
-            code = result["code"]
-            if isinstance(code, dict):
-                st.code(code.get("code", ""), language="python")
-            else:
-                st.code(code, language="python")
 
         # ---------------- COMPARISON ----------------
-        if "comparison" in result:
+        comparison = result.get("comparison")
+        if comparison:
             st.subheader("📊 Comparison")
 
-            comparison = result["comparison"]
             if isinstance(comparison, dict):
-                st.write(comparison.get("comparison", ""))
+                data = comparison.get("results")
+
+                try:
+                    parsed = json.loads(data)
+                except:
+                    parsed = data
+
+                if isinstance(parsed, dict):
+                    st.write(parsed.get("summary", ""))
+                    st.table(parsed.get("comparison_table", []))
+                else:
+                    st.write(parsed)
+
             else:
                 st.write(comparison)
 
-        # ---------------- REPORT ----------------
-        if "report" in result:
-            st.subheader("📝 Final Report")
+            st.divider()
 
-            report = result["report"]
+
+        # ---------------- CODE ----------------
+        code = result.get("code")
+        if code:
+            st.subheader("💻 Code")
+
+            if isinstance(code, dict):
+                st.code(code.get("results", ""), language="python")
+            else:
+                st.code(code, language="python")
+
+            st.divider()
+
+
+        # ---------------- SUMMARY ----------------
+        summary = result.get("summary")
+        if summary:
+            st.subheader("🧾 Explanation")
+
+            if isinstance(summary, dict):
+                st.write(summary.get("results", ""))
+            else:
+                st.write(summary)
+
+            st.divider()
+
+
+        # ---------------- REPORT ----------------
+        report = result.get("report")
+        if report:
+            st.subheader("📝 Detailed Report")
+
             if isinstance(report, dict):
-                st.write(report.get("report", ""))
+                st.write(report.get("results", ""))
             else:
                 st.write(report)
 
-        # ---------------- EMPTY CASE ----------------
-        if not result:
-            st.warning("No output generated. Try another query.")
+            st.divider()
+
+
+        # ---------------- SEARCH RESULTS ----------------
+        search = result.get("search")
+        if search:
+            st.subheader("🔍 Sources")
+
+            if isinstance(search, dict):
+                data = search.get("results")
+
+                if isinstance(data, list):
+                    for item in data:
+                        st.write(f"**{item.get('title', '')}**")
+                        st.write(item.get("snippet", ""))
+                        if item.get("link"):
+                            st.markdown(f"[Read more]({item.get('link')})")
+                        st.write("---")
+                else:
+                    st.write(data)

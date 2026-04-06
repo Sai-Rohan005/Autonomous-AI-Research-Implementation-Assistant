@@ -6,7 +6,6 @@ from tools.compare_tool import CompareTool
 from tools.report_tool import ReportTool
 from utils.llm import generate_text
 import re
-
 def run_agents(query):
 
     manager = ManagerTool()
@@ -15,19 +14,20 @@ def run_agents(query):
         "query": query,
         "history": [],
         "result": {},
-        "status":"ok"
+        "status": "ok"
     }
 
     max_steps = 5
 
     for step in range(max_steps):
-        
+
         try:
-        
             last_obs = context["history"][-1] if context["history"] else None
             context["step"] = step
+
             # -------- THINK --------
-            response = manager._run(context,last_obs)
+            response = manager._run(context, last_obs)
+
             match = re.search(r"action\s*:\s*(\w+)", response, re.IGNORECASE)
             action = match.group(1).lower() if match else "finish"
 
@@ -36,59 +36,60 @@ def run_agents(query):
 
             print(f"\nStep {step+1} Thought:", thought)
 
-            # -------- STOP CONDITION --------
-            if "enough information" in thought.lower():
+            # -------- STOP --------
+            if action == "finish":
                 break
-            if "finish" in action:
-                break
+
             if len(context["history"]) > 0 and action == context["history"][-1]["action"]:
                 break
 
-
-            if "search" in action:
+            # -------- ACTION --------
+            if action == "search":
                 observation = SearchTool()._run(query)
                 context["result"]["search"] = observation
 
-            elif "summarize" in action:
+            elif action == "summarize":
                 observation = SummarizeTool()._run(str(context["result"]))
                 context["result"]["summary"] = observation
 
-
-            elif "code" in action:
+            elif action == "code":
                 observation = CodeTool()._run(query)
                 context["result"]["code"] = observation
 
-
-            elif "compare" in action:
+            elif action == "compare":
                 observation = CompareTool()._run(query)
                 context["result"]["comparison"] = observation
 
-            elif "report" in action:
+            elif action == "report":
                 observation = ReportTool()._run(context["result"])
                 context["result"]["report"] = observation
 
             else:
-                print("No valid action → stopping")
                 break
 
             # -------- OBSERVATION --------
             if observation["status"] != "ok":
                 context["reflection"] = "Previous step failed"
+
             context["history"].append({
                 "step": step,
                 "action": action,
-                "observation": observation,
-                "status":observation["status"]
+                "observation": str(observation.get("data", ""))[:300],
+                "status": observation["status"]
             })
-            if len(context["history"]) > 1:
-                if context["history"][-1]["action"] == context["history"][-2]["action"]:
-                    break
+
+            # -------- LIMIT HISTORY --------
             if len(context["history"]) > 3:
                 context["history"] = context["history"][-3:]
-        except Exception as e:
-            print("Error in ReAct Loop: ",e)
+            # print(context)
 
-    return  generate_text(f"""
+        except Exception as e:
+            context["status"] = "error"
+            context["error"] = str(e)
+            break
+
+    # -------- FINAL ANSWER --------
+    final_answer = generate_text(f"""
 Answer the user query clearly.
 
 Use:
@@ -101,3 +102,13 @@ Be structured and clear.
 Context:
 {context}
 """)
+
+    return {
+    "final_answer": final_answer,
+    "history": context["history"],
+    "summary": context["result"].get("summary", None),
+    "code": context["result"].get("code", None),
+    "comparison": context["result"].get("comparison", None),
+    "report": context["result"].get("report", None),
+    "search": context["result"].get("search", None)
+}
