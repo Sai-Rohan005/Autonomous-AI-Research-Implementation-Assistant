@@ -55,7 +55,7 @@ class ReportTool(BaseTool):
 
             return {
                 "status": "ok",
-                "report": result
+                "results": result
             }
 
         except Exception as e:
@@ -66,7 +66,7 @@ class ReportTool(BaseTool):
 
                 return {
                     "status": "ok",
-                    "report": result2
+                    "results": result2
                 }
 
             except Exception as e:
@@ -74,5 +74,5 @@ class ReportTool(BaseTool):
 
                 return {
                     "status": "error",
-                    "report": ""
+                    "results": ""
                 }

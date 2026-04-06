@@ -62,7 +62,7 @@ class CompareTool(BaseTool):
 
             return {
                 "status": "ok",
-                "comparison": result
+                "results": result
             }
 
         except Exception as e:
@@ -73,7 +73,7 @@ class CompareTool(BaseTool):
 
                 return {
                     "status": "ok",
-                    "comparison": result2
+                    "results": result2
                 }
 
             except Exception as e:
@@ -81,7 +81,7 @@ class CompareTool(BaseTool):
 
                 return {
                     "status": "error",
-                    "comparison": ""
+                    "results": ""
                 }
 
         

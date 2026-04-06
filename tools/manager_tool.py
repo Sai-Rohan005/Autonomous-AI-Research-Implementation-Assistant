@@ -72,9 +72,14 @@ Before choosing action:
 ### Previous Observation :
 {last_obs}
 
-### ✅ Output Format:
-Return ONLY ONE word from:
+#
+Return ONLY ONE word in action from:
 search / summarize / code / compare / report / finish
+
+Return in format:
+
+Thought: <reasoning>
+Action: <one action>
 
 NO explanation.
 """

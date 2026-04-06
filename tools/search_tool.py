@@ -41,27 +41,25 @@ class SearchTool(BaseTool):
                     results = list(ddgs.text(refined_query, max_results=3))
                     return {
                         "status":"ok", 
-                        "search":results
+                        "results":results
                         }
             except:
                 print("DDG Internal Error:")
                 try:
                     fallback = generate_text(f"Explain {query}")
                     print("After DDG Fallback\n",fallback)
-                    return [{
-                        "title": "Fallback",
-                        "snippet": fallback,
-                        "link": ""
-                    }]
+                    return {
+                        "status":"ok",
+                        "results":fallback
+                    }
                 except Exception as e:
                     print("Fallback Error:", e)
-                    return [{
-                        "title": "Error",
-                        "snippet": "Unable to fetch results",
-                        "link": ""
-                    }]
+                    return {
+                        "status":"error",
+                        "results":""
+                    }
 
         return {
                 "status":"ok", 
-                "search":results
+                "results":results
                 }

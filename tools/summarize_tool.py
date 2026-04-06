@@ -34,7 +34,7 @@ class SummarizeTool(BaseTool):
 
             return {
                 "status": "ok",
-                "summary": result
+                "results": result
             }
 
         except Exception as e:
@@ -47,7 +47,7 @@ class SummarizeTool(BaseTool):
 
                 return {
                     "status": "ok",
-                    "summary": result_second
+                    "results": result_second
                 }
 
             except Exception as e:
@@ -55,7 +55,7 @@ class SummarizeTool(BaseTool):
 
                 return {
                     "status": "error",
-                    "summary": ""
+                    "results": ""
                 }
 
     

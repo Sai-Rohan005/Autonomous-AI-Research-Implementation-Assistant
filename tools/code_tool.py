@@ -41,7 +41,7 @@ class CodeTool(BaseTool):
 
             return {
                 "status": "ok",
-                "code": result             
+                "results": result             
             }
 
         except Exception as e:
@@ -52,7 +52,7 @@ class CodeTool(BaseTool):
 
                     return {
                         "status": "ok",
-                        "code": result_second
+                        "results": result_second
                     }
 
                 except Exception as e:
@@ -60,6 +60,6 @@ class CodeTool(BaseTool):
 
                     return {
                         "status": "error",
-                        "code": ""
+                        "results": ""
                     }
 
