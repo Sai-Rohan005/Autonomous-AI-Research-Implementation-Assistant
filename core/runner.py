@@ -74,7 +74,7 @@ def run_agents(query):
             context["history"].append({
                 "step": step,
                 "action": action,
-                "observation": str(observation.get("data", ""))[:300],
+                "observation": str(observation.get("results", ""))[:300],
                 "status": observation["status"]
             })
 

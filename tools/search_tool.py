@@ -27,7 +27,7 @@ class SearchTool(BaseTool):
 
             return {
                 "status":"ok", 
-                "search":results
+                "results":results
                 }
 
         except Exception as e:
