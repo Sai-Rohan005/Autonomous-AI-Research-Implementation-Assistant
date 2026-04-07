@@ -1,36 +1,24 @@
-# Use Python 3.13 slim image
-FROM python:3.13-slim
+FROM python:3.13.2-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system build tools for compiling packages like numpy
+# Install minimal system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        gcc \
-        g++ \
-        gfortran \
-        libffi-dev \
-        libssl-dev \
-        wget \
-        curl \
-        git \
-        && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends libffi-dev libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files first (leverage Docker cache)
+# Copy dependency files
 COPY requirements.txt .
-COPY runtime.txt .
 
-# Upgrade pip and install Python dependencies
+# Upgrade pip and install dependencies
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the app
+# Copy app files
 COPY . .
 
-# Expose port (adjust for Streamlit)
+# Expose port for Streamlit
 EXPOSE 8501
 
-# Command to run app
+# Run the app
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
