@@ -67,6 +67,11 @@ Agents use tools to perform actions:
 SearchTool → DuckDuckGo
 LLM Tools → Gemini API
 
+🛡️ Safety Guardrail
+Filters unsafe or harmful queries
+Ensures responsible AI behavior
+Prevents misuse of the system
+
 🧠 Context Memory
 
 Stores:
