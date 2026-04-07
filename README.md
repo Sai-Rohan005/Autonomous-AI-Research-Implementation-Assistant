@@ -46,27 +46,6 @@ Step-by-step flow:
 10. Final answer is generated using all collected information
 
 
-User Query
-   ↓
-Safety Guardrail
-   ↓
-Manager Agent (ReAct Planner)
-   ↓ decides next action
----------------------------------
-|       Specialized Agents       |
-|-------------------------------|
-| Search Agent      → Web Search |
-| Summarize Agent   → LLM        |
-| Code Agent        → LLM        |
-| Compare Agent     → LLM        |
-| Report Agent      → LLM        |
----------------------------------
-   ↓
-Context Memory (history + results)
-   ↓
-Final Answer Generation
-
-
 🧩 Key Components
 🧠 Manager Agent (Planner)
 Central brain of the system
