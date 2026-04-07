@@ -49,61 +49,62 @@ Step-by-step flow:
 
 
 
-🧩 Key Components
-🧠 Manager Agent (Planner)
+🧩 Key Components :
+🧠 Manager Agent (Planner) :
 Central brain of the system
 Uses LLM reasoning
 Decides next action dynamically
 Prevents unnecessary steps
+
 🤖 Specialized Agents
 
 Each agent has a single responsibility:
 
-🔍 Search Agent → fetch external information
-🧾 Summarization Agent → simplify content
-💻 Code Agent → generate code
-📊 Comparison Agent → structured comparisons
-📝 Report Agent → final structured output
-🛠️ Tools (Execution Layer)
+🔍 Search Agent → fetch external information.
+🧾 Summarization Agent → simplify content.
+💻 Code Agent → generate code.
+📊 Comparison Agent → structured comparisons.
+📝 Report Agent → final structured output.
+🛠️ Tools (Execution Layer).
 
 Agents use tools to perform actions:
-SearchTool → DuckDuckGo
-LLM Tools → Gemini API
+SearchTool → DuckDuckGo.
+LLM Tools → Gemini API.
 
-🛡️ Safety Guardrail
-Filters unsafe or harmful queries
-Ensures responsible AI behavior
-Prevents misuse of the system
+🛡️ Safety Guardrail :
+Filters unsafe or harmful queries .
+Ensures responsible AI behavior.
+Prevents misuse of the system.
 
-🧠 Context Memory
+🧠 Context Memory :
 
 Stores:
-- Query
-- Previous actions
-- Observations
-- Results
+- Query.
+- Previous actions.
+- Observations.
+- Results.
 
 This enables:
-✔ Multi-step reasoning
-✔ Avoiding repeated actions
-✔ Context-aware decisions
+✔ Multi-step reasoning.
+✔ Avoiding repeated actions.
+✔ Context-aware decisions.
 
-🔁 Example Execution
+🔁 Example Execution:
 
 Query:
-"Compare RNN and LSTM"
+"Compare RNN and LSTM"?
 
 Execution:
 Step 1:
-Thought → Need comparison
-Action → compare
+Thought → Need comparison.
+Action → compare.
 
 Step 2:
-Thought → Enough info
-Action → finish
+Thought → Enough info.
+Action → finish.
 
 
-🖥️ User Interface
+🖥️ User Interface:
 Built with Streamlit
 Sequential output (like ChatGPT)
 Displays:
@@ -111,7 +112,7 @@ Final answer
 Comparison / Code / Summary (if applicable)
 Sources (if used)
 
-🛠️ Tech Stack
+🛠️ Tech Stack:
 Python
 Streamlit
 Gemini API
@@ -119,15 +120,15 @@ DuckDuckGo Search
 ReAct Architecture
 
 
-⚙️ Setup & Installation
-🔧 Prerequisites
+⚙️ Setup & Installation:
+🔧 Prerequisites:
 Python 3.9+
 Git
 Internet connection (for API calls)
 
 Installation : 
-git clone https://github.com/your-username/your-repo.git
-cd AI_Research_Agent
+git clone https://github.com/your-username/your-repo.git .
+cd AI_Research_Agent .
 
 python -m venv venv
 source venv/bin/activate      # Mac/Linux
