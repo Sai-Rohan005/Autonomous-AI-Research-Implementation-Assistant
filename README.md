@@ -116,5 +116,43 @@ DuckDuckGo Search
 ReAct Architecture
 
 
+⚙️ Setup & Installation
+🔧 Prerequisites
+Python 3.9+
+Git
+Internet connection (for API calls)
+
+Installation : 
+git clone https://github.com/your-username/your-repo.git
+cd AI_Research_Agent
+
+python -m venv venv
+source venv/bin/activate      # Mac/Linux
+venv\Scripts\activate         # Windows
+
+pip install -r requirements.txt
+
+
+🔑 API Key Setup
+
+This project uses Google Gemini API
+
+Step 1: Get API Key
+Go to: https://ai.google.dev/
+Generate API key
+🌱 Environment Configuration
+
+Create a .env file:
+GEMINI_API_KEY=your_api_key_here
+
+Run command : 
+streamlit run app.py
+
+🧪 Testing
+✅ Unit Testing
+
+Each agent can be tested independently:
+pytest tests/test_agents.py
+
 
 
