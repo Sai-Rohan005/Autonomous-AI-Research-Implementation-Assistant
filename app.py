@@ -36,13 +36,15 @@ if run_clicked:
         st.session_state.running = False
 
         st.success("✅ Completed!")
-
+        
+        with st.expander("debug"):
+            st.write(result)
         # ---------------- FINAL ANSWER ----------------
         if isinstance(result, dict) and result.get("final_answer"):
             st.subheader("🎯 Final Answer")
             st.write(result["final_answer"])
             st.divider()
-
+        
 
         # ---------------- COMPARISON ----------------
         comparison = result.get("comparison")

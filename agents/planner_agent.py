@@ -1,4 +1,5 @@
 from crewai import Agent
+from tools.manager_tool import ManagerTool
 
 Planner_Agent = Agent(
     role="AI Planning Specialist",
@@ -8,7 +9,7 @@ Planner_Agent = Agent(
         "Output the plan as an ordered list of steps."
     ),
     backstory="A strategic AI planner who breaks down complex queries into structured steps for efficient execution.",
-    tools=[],
+    tools=[ManagerTool()],
     llm="gemini-flash-latest"
 )
 

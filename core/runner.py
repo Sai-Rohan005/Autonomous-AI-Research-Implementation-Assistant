@@ -1,12 +1,44 @@
 from tools.manager_tool import ManagerTool
-from tools.search_tool import SearchTool
-from tools.summarize_tool import SummarizeTool
-from tools.code_tool import CodeTool
-from tools.compare_tool import CompareTool
-from tools.report_tool import ReportTool
+from agents.code_agent import Code_Agent
+from agents.comparision_agent import Comparison_Agent
+from agents.report_agent import Report_Agent
+from agents.search_agent import Search_Agent
+from agents.summarization_agent import Summarization_Agent
 from utils.llm import generate_text
 import re
+
+def safety_check(query):
+    prompt = f"""
+    You are a strict AI safety filter.
+
+    Check if the following query is SAFE.
+
+    Block if it involves:
+    - illegal activities
+    - hacking
+    - violence
+    - harmful instructions
+    - unethical behavior
+
+    Query: {query}
+
+    Return ONLY:
+    SAFE or UNSAFE
+    """
+
+    result = generate_text(prompt).strip().upper()
+
+    return result == "SAFE"
+
+
+
 def run_agents(query):
+
+    if not safety_check(query):
+        return {
+            "final_answer": "❌ This query cannot be processed due to safety policies.",
+            "history": [],
+        }
 
     manager = ManagerTool()
 
@@ -45,23 +77,23 @@ def run_agents(query):
 
             # -------- ACTION --------
             if action == "search":
-                observation = SearchTool()._run(query)
+                observation = Search_Agent().run(query)
                 context["result"]["search"] = observation
 
             elif action == "summarize":
-                observation = SummarizeTool()._run(str(context["result"]))
+                observation = Summarization_Agent().run(str(context["result"]))
                 context["result"]["summary"] = observation
 
             elif action == "code":
-                observation = CodeTool()._run(query)
+                observation = Code_Agent().run(query)
                 context["result"]["code"] = observation
 
             elif action == "compare":
-                observation = CompareTool()._run(query)
+                observation = Comparison_Agent().run(query)
                 context["result"]["comparison"] = observation
 
             elif action == "report":
-                observation = ReportTool()._run(context["result"])
+                observation = Report_Agent().run(context["result"])
                 context["result"]["report"] = observation
 
             else:
