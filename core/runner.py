@@ -4,6 +4,7 @@ from agents.comparision_agent import Comparison_Agent
 from agents.report_agent import Report_Agent
 from agents.search_agent import Search_Agent
 from agents.summarization_agent import Summarization_Agent
+from utils.logger import log_error
 from utils.llm import generate_text
 import re
 
@@ -116,8 +117,9 @@ def run_agents(query):
             # print(context)
 
         except Exception as e:
+            log_error(f"Agent execution failed at step {step}: {str(e)}")
             context["status"] = "error"
-            context["error"] = str(e)
+            context["error_details"] = str(e)
             break
 
     # -------- FINAL ANSWER --------

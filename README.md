@@ -45,6 +45,9 @@ Step-by-step flow:
 9. Loop continues until task is complete
 10. Final answer is generated using all collected information
 
+![Architecture Diagram](images/Architechture_Diagram.png)
+
+
 
 🧩 Key Components
 🧠 Manager Agent (Planner)
