@@ -37,8 +37,8 @@ if run_clicked:
 
         st.success("✅ Completed!")
         
-        with st.expander("debug"):
-            st.write(result)
+        # with st.expander("debug"):
+        #     st.write(result)
         # ---------------- FINAL ANSWER ----------------
         if isinstance(result, dict) and result.get("final_answer"):
             st.subheader("🎯 Final Answer")
