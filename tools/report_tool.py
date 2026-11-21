@@ -1,6 +1,7 @@
 from utils.llm import generate_text,generate_text_fallback
 from crewai.tools import BaseTool
 from utils.llm import generate_text
+from utils.logger import log_error
 
 class ReportTool(BaseTool):
     name: str = "Report Tool"
@@ -59,7 +60,7 @@ class ReportTool(BaseTool):
             }
 
         except Exception as e:
-            print("Primary Report LLM Failed:", e)
+            log_error("tool_failed")
 
             try:
                 result2 = generate_text_fallback(prompt)
@@ -70,7 +71,7 @@ class ReportTool(BaseTool):
                 }
 
             except Exception as e:
-                print("Secondary Report LLM Failed:", e)
+                log_error("tool_failed")
 
                 return {
                     "status": "error",

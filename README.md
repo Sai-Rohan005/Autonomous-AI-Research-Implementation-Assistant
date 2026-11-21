@@ -1,273 +1,132 @@
-# Document-grounded backend (first migration slice)
+# Autonomous AI Research Assistant
 
-The new FastAPI path is independent of the legacy Streamlit/CrewAI application
-documented below. It accepts UTF-8 `.txt` and `.md` documents and returns cited
-source excerpts, or abstains when it cannot produce a validated answer.
+The main application is a Streamlit UI (`app.py`) calling the legacy
+`core/runner.py` decision loop. This README distinguishes that path from the
+separate document-grounded prototype in `backend/`.
 
-This deliberately small RAG implementation uses term-overlap retrieval, not
-embeddings or a vector database. A typed, allowlisted `retrieve` call replaces
-free-text action parsing in this path. Code selects the single retrieval tool;
-there is no autonomous model planner. Each request runs at most one retrieval
-and one generation. It cannot invoke legacy web search or code tools.
+## Current runner behavior
 
-## Run the backend
+1. An LLM pre-filter permits only a normalized `SAFE` verdict.
+2. The manager returns text; the runner regex-parses `Action:`.
+3. Allowed actions are search, summarize, code, compare, report, and finish.
+4. The loop stops after five iterations, a consecutive repeated action, an
+   unknown action, missing action, finish, or a loop exception.
+5. Only the last three tool observations remain in returned history. Each
+   observation is truncated to 300 characters. This is not a token budget.
+6. After an allowed query, final answer generation still runs when the loop
+   stops or encounters an error. A blocked query returns the refusal directly.
 
-Use Python 3.13 and a separate environment from the legacy application:
+Empty and `None` queries are currently forwarded to the safety prompt. The
+runner does not validate them locally. The safety pre-filter is not a reliable
+prompt-injection defense, and generated answers are not independently verified.
 
-```sh
-python3 -m venv .venv-backend
-source .venv-backend/bin/activate
-pip install -r requirements-backend.txt
-export GEMINI_API_KEY='your-key'
-export GEMINI_MODEL='gemini-2.5-flash'  # optional; this is the default
-uvicorn backend.api:app --host 127.0.0.1 --port 8000
-```
+The current agent modules export CrewAI `Agent` instances, while the runner
+calls them as factories (`Search_Agent().run(...)`, for example). This mismatch
+has not been fixed in this behavior-freezing change: real dispatch can fail and
+fall through to final generation. The characterization tests use agent doubles
+to freeze the runner's dispatch contract, not to prove CrewAI integration works.
 
-The backend reads environment variables directly; it does not load `.env` files.
-Importing it or uploading text does not require credentials. Questions that
-require a model abstain if credentials or the provider are unavailable.
+`utils/llm.py` tries the primary Gemini model and then the existing fallback
+model. If both fail, it returns an empty string. The search tool already waits
+two seconds and retries DuckDuckGo once before its LLM fallback. There is no
+central application retry policy with backoff, deadlines, or retry budgets;
+provider SDK behavior is separate.
 
-Upload a raw text body (not multipart), then use its returned `document_id`:
+## Run the main application
 
-```sh
-curl -X POST 'http://127.0.0.1:8000/documents?filename=notes.txt' \
-  -H 'Content-Type: text/plain' --data-binary @notes.txt
-curl -X POST 'http://127.0.0.1:8000/questions' \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"When is the launch?","document_ids":["ID_FROM_UPLOAD"]}'
-```
-
-The answer includes `abstained`, a machine-readable `reason`, `citations`, and
-ordered `trace` events. Citations contain document/chunk IDs, filename, exact
-quote, and zero-based Unicode character offsets `[start, end)` in the original
-text. The answer consists of numbered excerpts; it does not synthesize prose.
-Unknown IDs return 404; malformed requests return 422; unsupported media types
-return 415; exceeded upload/corpus limits return 413.
-
-## Boundaries and defenses
-
-- Only explicitly requested document IDs are searched. Documents are chunked
-  into 1,000-character spans with 100-character overlap; at most five matching
-  chunks are considered. Whole chunks are admitted in retrieval order.
-- The configured 8,192-token budget includes the complete serialized prompt
-  (instructions, schema, question, source IDs, and admitted text), counted by the
-  selected Gemini model. It reserves 1,024 output tokens, also enforced in the
-  generation request. Counting failure causes abstention. There is no growing
-  conversation history or automatic fallback model.
-- Question and document content are serialized as untrusted JSON data. The
-  model receives no tools, credentials, or prior requests. Tool calls and model
-  outputs reject unknown fields. Every returned quote must occur in a supplied
-  chunk; otherwise the entire answer abstains.
-- These controls prevent execution and unsupported generated prose; they do
-  not prove quotation relevance or make malicious source text trustworthy.
-  Injection text can itself be quoted. Treat returned excerpts as untrusted
-  text when rendering them. Lexical retrieval can miss paraphrases and
-  character chunking can split sentences.
-- The service is a local, single-user prototype: no authentication, persistent
-  storage, or tenant isolation. Documents remain in process memory until restart
-  (1 MB/file, 10 MB total, 100 documents). Use one worker. Selected text and the question go to
-  Gemini. Do not expose this service publicly or upload sensitive documents
-  without appropriate access and data-handling controls.
-- Traces record retrieval counts, context budgets, and outcomes, not raw prompts,
-  secrets, or hidden reasoning. Provider error text is not returned.
-
-## Verify and evaluate
+Use a separate Python environment and install `requirements.txt`:
 
 ```sh
-python -m pytest tests/test_backend.py tests/test_evals.py -q
-python -m evals.run                       # offline, scripted pipeline checks
-python -m evals.run --mode live           # explicitly uses Gemini and may cost money
-```
-
-`evals/cases.json` versions answerability, citation, injection, and scope fixtures.
-Reports include per-case outcomes, dataset SHA-256, model ID, and context limits;
-a failed case makes the command exit nonzero. Replay mode uses scripted outputs
-and byte counts to test contracts. Its pass count is **not a model-quality
-metric**. Live mode skips the two deliberately malformed model-output fixtures,
-fails infrastructure errors, and checks exact expected excerpts on the remaining
-small fixture set. Live model behavior is not deterministic even at temperature
-zero, and a provider may update a model behind an ID. No live results are claimed.
-Dependencies, including transitive dependencies, are pinned for repeatable setup.
-
-The original `tests/` files still exercise the legacy path and may call external
-services; the commands above intentionally select the new offline suite.
-
-For Docker, build with `docker build -f Dockerfile.backend -t research-backend .`
-and run with `docker run --rm -p 127.0.0.1:8000:8000 --env GEMINI_API_KEY research-backend`.
-The existing Dockerfile continues to run Streamlit.
-
-## Change map
-
-- `backend/models.py`: strict API, tool-call, citation, and trace contracts.
-- `backend/store.py`: bounded text ingestion, stable source spans, lexical retrieval.
-- `backend/engine.py`: tool routing, prompt budgeting, quote validation, abstention.
-- `backend/gemini.py`: lazy provider access, token counting, output cap.
-- `backend/api.py`: upload and question HTTP endpoints with isolated app state.
-- `evals/` and the new tests: offline behavior checks and explicit live evaluation.
-
----
-
-## Legacy application
-
-🧠 Autonomous AI Research & Implementation Assistant
-
-This project is an agentic AI system that can understand a user query, decide how to solve it, and dynamically use multiple specialized agents to produce a final answer.
-
-Unlike traditional AI applications that follow a fixed pipeline, this system uses a ReAct (Reason + Act) loop, allowing it to think step-by-step and choose actions intelligently.
-
-Most AI systems today:
- Follow a fixed pipeline (search → summarize → output)
- Cannot adapt to different query types
- Treat all queries the same way
-
-Our Solution
-
-We built a multi-agent system where:
-✔ The system decides WHAT to do (Planner)
-✔ Specialized agents decide HOW to do it
-✔ Tools execute the actual operations
-
-This makes the system:
-✔ Dynamic
-✔ Context-aware
-✔ Adaptive to different queries
-
-🧠 Core Idea: ReAct-Based Agent System
-
-The system follows a ReAct loop:
-Thought → Action → Observation → Repeat → Final Answer
-
-⚙️ How the System Works
-Step-by-step flow:
-
-1. User gives a query
-2. Safety Guardrail (checks if query is according to policy)
-3. Manager (Planner Agent) analyzes the query
-4. Decides the next best action:
-   - search
-   - summarize
-   - code
-   - compare
-   - report
-5. Calls the corresponding agent
-6. Agent uses its tool to perform the task
-7. Result is stored in context
-8. Manager re-evaluates and decides next step
-9. Loop continues until task is complete
-10. Final answer is generated using all collected information
-
-![Architecture Diagram](images/Architechture_Diagram.png)
-
-
-
-🧩 Key Components :
-🧠 Manager Agent (Planner) :
-Central brain of the system
-Uses LLM reasoning
-Decides next action dynamically
-Prevents unnecessary steps
-
-🤖 Specialized Agents
-
-Each agent has a single responsibility:
-
-🔍 Search Agent → fetch external information.
-🧾 Summarization Agent → simplify content.
-💻 Code Agent → generate code.
-📊 Comparison Agent → structured comparisons.
-📝 Report Agent → final structured output.
-🛠️ Tools (Execution Layer).
-
-Agents use tools to perform actions:
-SearchTool → DuckDuckGo.
-LLM Tools → Gemini API.
-
-🛡️ Safety Guardrail :
-Filters unsafe or harmful queries .
-Ensures responsible AI behavior.
-Prevents misuse of the system.
-
-🧠 Context Memory :
-
-Stores:
-- Query.
-- Previous actions.
-- Observations.
-- Results.
-
-This enables:
-✔ Multi-step reasoning.
-✔ Avoiding repeated actions.
-✔ Context-aware decisions.
-
-🔁 Example Execution:
-
-Query:
-"Compare RNN and LSTM"?
-
-Execution:
-Step 1:
-Thought → Need comparison.
-Action → compare.
-
-Step 2:
-Thought → Enough info.
-Action → finish.
-
-
-🖥️ User Interface:
-Built with Streamlit
-Sequential output (like ChatGPT)
-Displays:
-Final answer
-Comparison / Code / Summary (if applicable)
-Sources (if used)
-
-🛠️ Tech Stack:
-Python
-Streamlit
-Gemini API
-DuckDuckGo Search
-ReAct Architecture
-
-
-⚙️ Setup & Installation:
-🔧 Prerequisites:
-Python 3.9+
-Git
-Internet connection (for API calls)
-
-Installation : 
-git clone https://github.com/your-username/your-repo.git .
-cd AI_Research_Agent .
-
-python -m venv venv
-source venv/bin/activate      # Mac/Linux
-venv\Scripts\activate         # Windows
-
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-
-🔑 API Key Setup
-
-This project uses Google Gemini API
-
-Step 1: Get API Key
-Go to: https://ai.google.dev/
-Generate API key
-🌱 Environment Configuration
-
-Create a .env file:
-GEMINI_API_KEY=your_api_key_here
-
-Run command : 
+export GEMINI_API_KEY='your-key'
 streamlit run app.py
+```
 
-🧪 Testing
-✅ Unit Testing
+The legacy LLM wrapper also loads `.env` via python-dotenv. No key is committed
+or hardcoded. Provider client creation is lazy, so importing the wrapper does
+not require credentials.
 
-Each agent can be tested independently:
-pytest tests/test_agents.py
+## JSON logging and per-run traces
 
+Application log messages are JSON objects emitted through Python's logging
+module. An allowlist restricts events and numeric usage metadata. Raw prompts,
+answers, model thoughts, credentials, and exception text are excluded. This
+configures the application's logger, not third-party library logging.
 
+`run_agents()` preserves its existing response fields and adds `trace`:
 
+```json
+{
+  "run_id": "a unique hexadecimal run identifier",
+  "steps": [
+    {
+      "step": 1,
+      "tool": "safety",
+      "input_summary": "text(chars=20)",
+      "output_summary": "safe",
+      "tokens_in": null,
+      "tokens_out": null,
+      "latency_ms": 12.5,
+      "status": "ok",
+      "error": null
+    }
+  ]
+}
+```
+
+This is an illustrative schema, not a measured run. The same trace object is
+atomically saved to `traces/<run_id>.json`, relative to the working directory,
+with private file permissions. Traces include safety, manager calls, tools,
+final generation, and nested LLM attempts. Numbering follows operation start
+order; parent latency includes nested operations. The trace is not truncated
+with the three-item history. Context-local state isolates concurrent runs.
+
+Each direct Gemini generation in `utils/llm.py` and the prototype adapter is
+instrumented. LLM entries use Gemini usage metadata: input prompt tokens and
+output candidate tokens plus reported thinking tokens. Missing metadata triggers
+Gemini token-count calls for the prompt and visible output. Retokenizing visible
+output cannot reconstruct unreported thinking tokens. Failed attempts retain
+available input counts; unknown output usage stays `null`. Counting failures
+do not fail successful answers or invent zero counts. Non-LLM parent steps have
+`null` usage, so aggregate only the nested LLM entries to avoid double counting.
+Arbitrary third-party calls do not automatically pass through these adapters.
+
+Blocked runs are persisted too. Exceptions that previously propagated still
+propagate after trace persistence. A trace write failure logs
+`trace_write_failed` and leaves the original answer/exception intact; the trace
+is still returned on successful runs. Trace files are excluded from Git and
+Docker build contexts. There is no retention/rotation policy yet.
+
+## Offline tests
+
+```sh
+python -m pytest tests/test_runner_characterization.py tests/test_observability.py -q
+```
+
+The 15 characterization tests were run against the unchanged runner before
+instrumentation. They mock the LLM, manager, and agents; they require no API key
+or network. Additional observability tests cover persistence, usage metadata,
+fallback accounting, unavailable counts, concurrency, and secret-safe logging.
+The other legacy tests may use live services; a full offline legacy integration
+suite is not claimed. No live Gemini quality or performance metrics are claimed.
+
+## Planned migration
+
+FastAPI integration with the main application, document-grounded Q&A in
+`run_agents()`, a structured model tool router, strict context management,
+answer verification, prompt-injection defenses, and a unified retry policy are
+planned. The current runner does not provide those capabilities.
+
+There is already an isolated experimental FastAPI implementation in `backend/`,
+with `.txt`/`.md` ingestion, lexical retrieval, and exact-quote validation. It is
+not wired to `app.py` or `run_agents()`. Exact-quote validation is not semantic
+answer verification. Its in-memory, unauthenticated store is a local prototype.
+
+Use its separate pinned environment and run `uvicorn backend.api:app` to inspect
+it. Its offline checks remain available with
+`python -m pytest tests/test_backend.py tests/test_evals.py -q`; `python -m evals.run`
+replays scripted pipeline fixtures, not model-quality measurements. Explicit
+`--mode live` uses Gemini and may incur cost. `Dockerfile` runs Streamlit;
+`Dockerfile.backend` builds the separate prototype.

@@ -6,9 +6,12 @@ from agents.search_agent import Search_Agent
 from agents.summarization_agent import Summarization_Agent
 from utils.logger import log_error
 from utils.llm import generate_text
+from utils.trace import operation, summarize, traced_run
+from typing import Any
 import re
 
-def safety_check(query):
+def safety_check(query: str | None) -> bool:
+    """Preserve the existing LLM SAFE/UNSAFE verdict interpretation."""
     prompt = f"""
     You are a strict AI safety filter.
 
@@ -33,9 +36,25 @@ def safety_check(query):
 
 
 
-def run_agents(query):
+def _run_tool(agent: Any, tool: str, value: Any) -> Any:
+    """Trace an agent invocation without changing its arguments or result."""
+    with operation(tool, value) as step:
+        result = agent().run(value)
+        step.output_summary = summarize(result)
+        if isinstance(result, dict) and result.get("status") != "ok":
+            step.status, step.error = "error", "ToolReportedFailure"
+        return result
 
-    if not safety_check(query):
+
+@traced_run
+def run_agents(query: str | None) -> dict[str, Any]:
+    """Run the legacy decision loop, returning its answer plus a persisted trace."""
+
+    with operation("safety", query) as safety_step:
+        safe = safety_check(query)
+        safety_step.status = "ok" if safe else "blocked"
+        safety_step.output_summary = "safe" if safe else "blocked"
+    if not safe:
         return {
             "final_answer": "❌ This query cannot be processed due to safety policies.",
             "history": [],
@@ -59,15 +78,12 @@ def run_agents(query):
             context["step"] = step
 
             # -------- THINK --------
-            response = manager._run(context, last_obs)
+            with operation("manager", context) as manager_step:
+                response = manager._run(context, last_obs)
+                manager_step.output_summary = summarize(response)
 
             match = re.search(r"action\s*:\s*(\w+)", response, re.IGNORECASE)
             action = match.group(1).lower() if match else "finish"
-
-            thought_match = re.search(r"thought\s*:\s*(.*)", response, re.IGNORECASE)
-            thought = thought_match.group(1) if thought_match else ""
-
-            print(f"\nStep {step+1} Thought:", thought)
 
             # -------- STOP --------
             if action == "finish":
@@ -78,23 +94,23 @@ def run_agents(query):
 
             # -------- ACTION --------
             if action == "search":
-                observation = Search_Agent().run(query)
+                observation = _run_tool(Search_Agent, "search", query)
                 context["result"]["search"] = observation
 
             elif action == "summarize":
-                observation = Summarization_Agent().run(str(context["result"]))
+                observation = _run_tool(Summarization_Agent, "summarize", str(context["result"]))
                 context["result"]["summary"] = observation
 
             elif action == "code":
-                observation = Code_Agent().run(query)
+                observation = _run_tool(Code_Agent, "code", query)
                 context["result"]["code"] = observation
 
             elif action == "compare":
-                observation = Comparison_Agent().run(query)
+                observation = _run_tool(Comparison_Agent, "compare", query)
                 context["result"]["comparison"] = observation
 
             elif action == "report":
-                observation = Report_Agent().run(context["result"])
+                observation = _run_tool(Report_Agent, "report", context["result"])
                 context["result"]["report"] = observation
 
             else:
@@ -114,16 +130,16 @@ def run_agents(query):
             # -------- LIMIT HISTORY --------
             if len(context["history"]) > 3:
                 context["history"] = context["history"][-3:]
-            # print(context)
 
         except Exception as e:
-            log_error(f"Agent execution failed at step {step}: {str(e)}")
+            log_error("agent_execution_failed")
             context["status"] = "error"
             context["error_details"] = str(e)
             break
 
     # -------- FINAL ANSWER --------
-    final_answer = generate_text(f"""
+    with operation("final_answer", context) as final_step:
+        final_answer = generate_text(f"""
 Answer the user query clearly.
 
 Use:
@@ -136,6 +152,7 @@ Be structured and clear.
 Context:
 {context}
 """)
+        final_step.output_summary = summarize(final_answer)
 
     return {
     "final_answer": final_answer,

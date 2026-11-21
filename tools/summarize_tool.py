@@ -1,6 +1,7 @@
 from utils.llm import generate_text,generate_text_fallback
 from crewai.tools import BaseTool
 from utils.llm import generate_text
+from utils.logger import log_error
 
 class SummarizeTool(BaseTool):
     name: str = "Summarization Tool"
@@ -9,7 +10,7 @@ class SummarizeTool(BaseTool):
     def _run(self, data: str):
         prompt = (
     "You are a world-class summarizer and technical communicator, expert at distilling complex information into clear, concise, and powerful summaries.\n\n"
-    
+
     "Task:\n"
     "Summarize the following content:\n\n"
     f"{data}\n\n"
@@ -38,7 +39,7 @@ class SummarizeTool(BaseTool):
             }
 
         except Exception as e:
-            print("Primary LLM Failed:", e)
+            log_error("tool_failed")
 
             try:
                 result_second = generate_text_fallback(
@@ -51,11 +52,11 @@ class SummarizeTool(BaseTool):
                 }
 
             except Exception as e:
-                print("Secondary LLM Failed:", e)
+                log_error("tool_failed")
 
                 return {
                     "status": "error",
                     "results": ""
                 }
 
-    
+

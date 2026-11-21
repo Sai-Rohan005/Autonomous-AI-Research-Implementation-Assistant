@@ -1,6 +1,7 @@
 """Offline behavior tests for ingestion, routing, context, and grounding."""
 
 import json
+from types import SimpleNamespace
 from typing import Callable
 from unittest.mock import MagicMock
 
@@ -312,6 +313,8 @@ def test_gemini_missing_credentials_and_adapter_contract(monkeypatch: pytest.Mon
     model._client = client
     client.models.count_tokens.return_value.total_tokens = 42
     client.models.generate_content.return_value.text = '{"citations": []}'
+    client.models.generate_content.return_value.usage_metadata = SimpleNamespace(
+        prompt_token_count=42, candidates_token_count=8, thoughts_token_count=0)
     assert model.count_tokens("test") == 42
     assert model.generate("test", 100) == '{"citations": []}'
     client.models.count_tokens.assert_called_once_with(model=model.model, contents="test")

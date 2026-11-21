@@ -1,6 +1,7 @@
 from utils.llm import generate_text,generate_text_fallback
 from crewai.tools import BaseTool
 from utils.llm import generate_text
+from utils.logger import log_error
 
 class CompareTool(BaseTool):
     name: str = "Comparison Tool"
@@ -66,7 +67,7 @@ class CompareTool(BaseTool):
             }
 
         except Exception as e:
-            print("Primary Comparison LLM Failed:", e)
+            log_error("tool_failed")
 
             try:
                 result2 = generate_text_fallback(prompt)
@@ -77,7 +78,7 @@ class CompareTool(BaseTool):
                 }
 
             except Exception as e:
-                print("Secondary LLM Failed:", e)
+                log_error("tool_failed")
 
                 return {
                     "status": "error",

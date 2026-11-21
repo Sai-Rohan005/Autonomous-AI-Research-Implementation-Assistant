@@ -21,6 +21,7 @@ ENV/
 .env
 
 *.log
+traces/
 
 # ---------------- OS Files ----------------
 .DS_Store

@@ -1,6 +1,7 @@
 from utils.llm import generate_text,generate_text_fallback
 from crewai.tools import BaseTool
 from utils.llm import generate_text
+from utils.logger import log_error
 
 class CodeTool(BaseTool):
     name: str = "Code Genrator Tool"
@@ -45,7 +46,7 @@ class CodeTool(BaseTool):
             }
 
         except Exception as e:
-                print("Primary LLM Failed:", e)
+                log_error("tool_failed")
 
                 try:
                     result_second = generate_text_fallback(prompt)
@@ -56,7 +57,7 @@ class CodeTool(BaseTool):
                     }
 
                 except Exception as e:
-                    print("Secondary LLM Failed:", e)
+                    log_error("tool_failed")
 
                     return {
                         "status": "error",

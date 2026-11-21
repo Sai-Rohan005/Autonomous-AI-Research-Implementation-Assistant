@@ -3,6 +3,10 @@
 import os
 from typing import Any
 
+from utils.trace import operation
+from utils.token_usage import record_usage
+
+
 class GeminiModel:
     """Use the same provider model for token counting and generation."""
 
@@ -31,11 +35,24 @@ class GeminiModel:
 
     def generate(self, prompt: str, max_output_tokens: int) -> str:
         """Request JSON within the output cap; the counted prompt carries schema."""
-        result = self._get_client().models.generate_content(
-            model=self.model, contents=prompt,
-            config={"temperature": 0, "max_output_tokens": max_output_tokens,
-                    "response_mime_type": "application/json"},
-        )
-        if not result.text:
-            raise RuntimeError("Provider returned no text")
-        return result.text
+        def count(text: str) -> int | None:
+            """Keep telemetry failures from changing answer behavior."""
+            try:
+                return self.count_tokens(text)
+            except Exception:
+                return None
+
+        with operation("llm:backend", prompt) as step:
+            try:
+                result = self._get_client().models.generate_content(
+                    model=self.model, contents=prompt,
+                    config={"temperature": 0, "max_output_tokens": max_output_tokens,
+                            "response_mime_type": "application/json"},
+                )
+            except Exception:
+                step.tokens_in = count(prompt)
+                raise
+            text = record_usage(result, prompt, step, count)
+            if not text:
+                raise RuntimeError("Provider returned no text")
+            return text

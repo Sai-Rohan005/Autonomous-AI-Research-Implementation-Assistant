@@ -1,6 +1,7 @@
 from crewai.tools import BaseTool
 from duckduckgo_search import DDGS
 from utils.llm import generate_text
+from utils.logger import log_error, log_info
 import time
 
 class SearchTool(BaseTool):
@@ -31,9 +32,10 @@ class SearchTool(BaseTool):
                 }
 
         except Exception as e:
-            print("Search Error:", e)
+            log_error("tool_failed")
 
             # 🔥 WAIT + RETRY
+            log_info("search_retry")
             time.sleep(2)
 
             try:
@@ -44,16 +46,16 @@ class SearchTool(BaseTool):
                         "results":results
                         }
             except:
-                print("DDG Internal Error:")
+                log_error("tool_failed")
                 try:
                     fallback = generate_text(f"Explain {query}")
-                    print("After DDG Fallback\n",fallback)
+                    log_info("search_fallback")
                     return {
                         "status":"ok",
                         "results":fallback
                     }
                 except Exception as e:
-                    print("Fallback Error:", e)
+                    log_error("tool_failed")
                     return {
                         "status":"error",
                         "results":""
