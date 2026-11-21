@@ -1,13 +1,14 @@
 from utils.llm import generate_text,generate_text_fallback
-from crewai.tools import BaseTool
 from utils.llm import generate_text
 from utils.logger import log_error
 
-class CompareTool(BaseTool):
+class CompareTool:
+    """Run the existing prompt as a plain Python tool."""
     name: str = "Comparison Tool"
     description: str = "Compare the given concepts or models. \n Return structured output including pros, cons, and a summary."
 
-    def _run(self, data: str):
+    def _run(self, data: str) -> dict[str, str]:
+        """Generate a comparison using the existing prompt and fallback."""
         prompt = (
     "You are a world-class technical analyst known for clear, balanced, and insightful comparisons.\n\n"
     

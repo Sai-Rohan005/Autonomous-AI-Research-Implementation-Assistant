@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from test_runner_characterization import harness  # Shared isolated runner fixture.
+from test_runner_characterization import call, harness  # Shared isolated runner fixture.
 from utils.logger import JsonFormatter
 from utils.trace import Trace, active_trace, operation, traced_run
 
@@ -67,7 +67,7 @@ def test_loop_failure_trace_excludes_exception_text(harness: SimpleNamespace) ->
     harness.manager._run.side_effect = RuntimeError("SECRET-ERROR")
     trace = harness.runner.run_agents("SECRET-QUERY")["trace"]
     assert trace["steps"][1]["status"] == "error"
-    assert trace["steps"][1]["error"] == "OperationFailed"
+    assert trace["steps"][1]["error"] == "RouterUnavailable"
     assert "SECRET" not in json.dumps(trace)
 
 
@@ -224,12 +224,19 @@ def test_empty_primary_response_still_falls_back(llm_module: SimpleNamespace) ->
 def test_runner_contains_all_nested_llm_attempts(harness: SimpleNamespace, llm_module: SimpleNamespace,
                                                tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Safety, planning, tool generation, and final usage belong to the same run."""
-    llm_module.client.models.generate_content.side_effect = [response("SAFE"), response("Action: search"),
-                                                            response("tool result"), response("Action: finish"),
+    llm_module.client.models.generate_content.side_effect = [response("SAFE"), response("route"),
+                                                            response("tool result"), response("route"),
                                                             response("final")]
     monkeypatch.setattr(harness.runner, "generate_text", llm_module.generate_text)
-    harness.manager._run.side_effect = lambda *_: llm_module.generate_text("planner")
-    harness.agents["search"].return_value.run.side_effect = lambda _: {
+    decisions = iter([call("web_search", query="q"), call("final_answer")])
+
+    def route(*_: object) -> object:
+        """Include an accounted provider call for each mocked routing decision."""
+        llm_module.generate_text("planner")
+        return next(decisions)
+
+    harness.manager._run.side_effect = route
+    harness.execute.side_effect = lambda *_: {
         "status": "ok", "results": llm_module.generate_text("tool")}
     result = harness.runner.run_agents("query")
     steps = result["trace"]["steps"]
@@ -269,9 +276,6 @@ def test_tool_logging_preserves_success_and_fallback(name: str, symbol: str,
     import sys
     from types import ModuleType
 
-    base = ModuleType("crewai.tools")
-    base.BaseTool = object
-    monkeypatch.setitem(sys.modules, "crewai.tools", base)
     llm = ModuleType("utils.llm")
     llm.generate_text = Mock(return_value="primary")
     llm.generate_text_fallback = Mock(return_value="fallback")
@@ -292,30 +296,50 @@ def test_tool_logging_preserves_success_and_fallback(name: str, symbol: str,
     assert "SECRET" not in captured.err
 
 
-def test_search_logging_preserves_retry_and_fallback(monkeypatch: pytest.MonkeyPatch,
+def test_search_logging_exposes_transport_failure(monkeypatch: pytest.MonkeyPatch,
                                                    capsys: pytest.CaptureFixture[str]) -> None:
-    """Search retains its existing delayed retry and LLM fallback without prints."""
+    """Search makes one attempt; the executor owns retries and no fake sources appear."""
     import sys
     from types import ModuleType
 
-    base = ModuleType("crewai.tools")
-    base.BaseTool = object
     ddg = ModuleType("duckduckgo_search")
     ddg.DDGS = Mock(side_effect=RuntimeError("SECRET-SEARCH"))
     llm = ModuleType("utils.llm")
     llm.generate_text = Mock(return_value="SECRET-RESPONSE")
-    for name, stub in [("crewai.tools", base), ("duckduckgo_search", ddg), ("utils.llm", llm)]:
+    for name, stub in [("duckduckgo_search", ddg), ("utils.llm", llm)]:
         monkeypatch.setitem(sys.modules, name, stub)
     path = Path(__file__).resolve().parents[1] / "tools" / "search_tool.py"
     spec = importlib.util.spec_from_file_location("observed_search", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    monkeypatch.setattr(module.time, "sleep", Mock())
-    assert module.SearchTool()._run("SECRET-INPUT") == {"status": "ok", "results": "SECRET-RESPONSE"}
-    assert ddg.DDGS.call_count == 2
-    module.time.sleep.assert_called_once_with(2)
-    llm.generate_text.side_effect = RuntimeError("SECRET-LLM")
-    assert module.SearchTool()._run("query") == {"status": "error", "results": ""}
+    with pytest.raises(ConnectionError, match="Web search failed"):
+        module.SearchTool()._run("SECRET-INPUT")
+    assert ddg.DDGS.call_count == 1
+    llm.generate_text.assert_not_called()
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "SECRET" not in captured.err
+
+
+def test_structured_generation_passes_response_schema(llm_module: SimpleNamespace) -> None:
+    """The router's provider request includes a real JSON response schema and usage."""
+    from core.models import ToolCall
+
+    llm_module.client.models.generate_content.return_value = response('{"tool":"clarify"}')
+    trace = Trace()
+    token = active_trace.set(trace)
+    try:
+        llm_module.generate_structured("prompt", ToolCall.model_json_schema())
+    finally:
+        active_trace.reset(token)
+    config = llm_module.client.models.generate_content.call_args.kwargs["config"]
+    assert config["response_mime_type"] == "application/json"
+    assert config["response_json_schema"] == ToolCall.model_json_schema()
+    assert len(trace.steps) == 1 and trace.steps[0].tokens_in == 11
+
+
+def test_empty_structured_output_reaches_router_validation(llm_module: SimpleNamespace) -> None:
+    """Empty JSON output is a repairable validation failure, not a model fallback."""
+    llm_module.client.models.generate_content.return_value = response("")
+    assert llm_module.generate_structured("prompt", {}) == ""
+    assert llm_module.client.models.generate_content.call_count == 1

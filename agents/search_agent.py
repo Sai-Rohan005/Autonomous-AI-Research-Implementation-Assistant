@@ -1,17 +1,10 @@
-from crewai import Agent, Task
+"""Plain Python adapter for the search tool."""
+
+from agents.base import PromptAgent
 from tools.search_tool import SearchTool
 
-Search_Agent = Agent(
-    role="Information Retrieval Specialist",
-    goal="Search and retrieve relevant information",
-    backstory="Expert in retrieving accurate information",
-    tools=[SearchTool()],
-    llm="gemini-flash-latest"
-)
 
-Search_Task = Task(
-    description="Search for relevant information based on the query",
-    agent=Search_Agent,
-    expected_output="A list of relevant search results with titles and summaries"
+class Search_Agent(PromptAgent):
+    """Preserve the public agent interface without CrewAI orchestration."""
 
-)
+    tool_class = SearchTool

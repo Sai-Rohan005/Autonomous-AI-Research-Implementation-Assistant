@@ -1,13 +1,14 @@
 from utils.llm import generate_text,generate_text_fallback
-from crewai.tools import BaseTool
 from utils.llm import generate_text
 from utils.logger import log_error
 
-class SummarizeTool(BaseTool):
+class SummarizeTool:
+    """Run the existing prompt as a plain Python tool."""
     name: str = "Summarization Tool"
     description: str = "Summarizes text into a concise explanation"
 
-    def _run(self, data: str):
+    def _run(self, data: str) -> dict[str, str]:
+        """Summarize text using the existing prompt and fallback."""
         prompt = (
     "You are a world-class summarizer and technical communicator, expert at distilling complex information into clear, concise, and powerful summaries.\n\n"
 

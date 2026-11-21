@@ -1,5 +1,6 @@
-# ---------------- Core Framework ----------------
-crewai
+# ---------------- Routing / Execution ----------------
+pydantic==2.11.4
+tenacity==9.1.4
 
 # ---------------- UI ----------------
 streamlit
@@ -18,9 +19,6 @@ google-generativeai
 duckduckgo-search
 google-search-results
 
-# ---------------- CrewAI Tools ----------------
-crewai-tools
-
 # ---------------- Testing (optional) ----------------
 pytest
-google-genai
+google-genai==1.70.0

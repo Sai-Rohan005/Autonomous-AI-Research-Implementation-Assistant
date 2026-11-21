@@ -1,13 +1,13 @@
 from utils.llm import generate_text,generate_text_fallback
-from crewai.tools import BaseTool
 from utils.llm import generate_text
 from utils.logger import log_error
 
-class ReportTool(BaseTool):
+class ReportTool:
+    """Run the existing prompt as a plain Python tool."""
     name: str = "Report Tool"
     description: str = "Generate the final report using all available information. \n Ensure the output is clear, structured, and easy to understand."
 
-    def _run(self, data: dict):
+    def _run(self, data: dict) -> dict[str, str]:
         """
         data = {
             "summary": "...",

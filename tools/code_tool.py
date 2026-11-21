@@ -1,13 +1,14 @@
 from utils.llm import generate_text,generate_text_fallback
-from crewai.tools import BaseTool
 from utils.llm import generate_text
 from utils.logger import log_error
 
-class CodeTool(BaseTool):
+class CodeTool:
+    """Run the existing prompt as a plain Python tool."""
     name: str = "Code Genrator Tool"
     description: str = "Generate high-quality code for the given query."
 
-    def _run(self, data: str):
+    def _run(self, data: str) -> dict[str, str]:
+        """Generate code text while preserving the existing result contract."""
         prompt = (
     "You are an expert in software engineer with 15+ years of experience, "
     "known for writing exceptionally clean, idiomatic, production-ready code.\n\n"

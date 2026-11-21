@@ -1,16 +1,14 @@
-from tools.search_tool import SearchTool
-from tools.summarize_tool import SummarizeTool
+"""The safety verdict contract remains independent of structured routing."""
 
-def test_search_tool():
-    tool = SearchTool()
-    result = tool._run("AI trends")
+from unittest.mock import Mock
 
-    assert isinstance(result, list) or isinstance(result, dict)
+import pytest
+
+from core.runner import safety_check
 
 
-def test_summarize_tool():
-    tool = SummarizeTool()
-    result = tool._run("Artificial Intelligence is a field...")
-
-    assert result["status"] == "ok"
-    assert "results" in result
+@pytest.mark.parametrize("verdict,expected", [("SAFE", True), (" safe\n", True), ("UNSAFE", False), ("SAFE because", False)])
+def test_safety_verdict(verdict: str, expected: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only normalized SAFE passes the legacy filter."""
+    monkeypatch.setattr("core.runner.generate_text", Mock(return_value=verdict))
+    assert safety_check("query") is expected
