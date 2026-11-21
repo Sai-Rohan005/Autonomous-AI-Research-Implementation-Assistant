@@ -1,3 +1,114 @@
+# Document-grounded backend (first migration slice)
+
+The new FastAPI path is independent of the legacy Streamlit/CrewAI application
+documented below. It accepts UTF-8 `.txt` and `.md` documents and returns cited
+source excerpts, or abstains when it cannot produce a validated answer.
+
+This deliberately small RAG implementation uses term-overlap retrieval, not
+embeddings or a vector database. A typed, allowlisted `retrieve` call replaces
+free-text action parsing in this path. Code selects the single retrieval tool;
+there is no autonomous model planner. Each request runs at most one retrieval
+and one generation. It cannot invoke legacy web search or code tools.
+
+## Run the backend
+
+Use Python 3.13 and a separate environment from the legacy application:
+
+```sh
+python3 -m venv .venv-backend
+source .venv-backend/bin/activate
+pip install -r requirements-backend.txt
+export GEMINI_API_KEY='your-key'
+export GEMINI_MODEL='gemini-2.5-flash'  # optional; this is the default
+uvicorn backend.api:app --host 127.0.0.1 --port 8000
+```
+
+The backend reads environment variables directly; it does not load `.env` files.
+Importing it or uploading text does not require credentials. Questions that
+require a model abstain if credentials or the provider are unavailable.
+
+Upload a raw text body (not multipart), then use its returned `document_id`:
+
+```sh
+curl -X POST 'http://127.0.0.1:8000/documents?filename=notes.txt' \
+  -H 'Content-Type: text/plain' --data-binary @notes.txt
+curl -X POST 'http://127.0.0.1:8000/questions' \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"When is the launch?","document_ids":["ID_FROM_UPLOAD"]}'
+```
+
+The answer includes `abstained`, a machine-readable `reason`, `citations`, and
+ordered `trace` events. Citations contain document/chunk IDs, filename, exact
+quote, and zero-based Unicode character offsets `[start, end)` in the original
+text. The answer consists of numbered excerpts; it does not synthesize prose.
+Unknown IDs return 404; malformed requests return 422; unsupported media types
+return 415; exceeded upload/corpus limits return 413.
+
+## Boundaries and defenses
+
+- Only explicitly requested document IDs are searched. Documents are chunked
+  into 1,000-character spans with 100-character overlap; at most five matching
+  chunks are considered. Whole chunks are admitted in retrieval order.
+- The configured 8,192-token budget includes the complete serialized prompt
+  (instructions, schema, question, source IDs, and admitted text), counted by the
+  selected Gemini model. It reserves 1,024 output tokens, also enforced in the
+  generation request. Counting failure causes abstention. There is no growing
+  conversation history or automatic fallback model.
+- Question and document content are serialized as untrusted JSON data. The
+  model receives no tools, credentials, or prior requests. Tool calls and model
+  outputs reject unknown fields. Every returned quote must occur in a supplied
+  chunk; otherwise the entire answer abstains.
+- These controls prevent execution and unsupported generated prose; they do
+  not prove quotation relevance or make malicious source text trustworthy.
+  Injection text can itself be quoted. Treat returned excerpts as untrusted
+  text when rendering them. Lexical retrieval can miss paraphrases and
+  character chunking can split sentences.
+- The service is a local, single-user prototype: no authentication, persistent
+  storage, or tenant isolation. Documents remain in process memory until restart
+  (1 MB/file, 10 MB total, 100 documents). Use one worker. Selected text and the question go to
+  Gemini. Do not expose this service publicly or upload sensitive documents
+  without appropriate access and data-handling controls.
+- Traces record retrieval counts, context budgets, and outcomes, not raw prompts,
+  secrets, or hidden reasoning. Provider error text is not returned.
+
+## Verify and evaluate
+
+```sh
+python -m pytest tests/test_backend.py tests/test_evals.py -q
+python -m evals.run                       # offline, scripted pipeline checks
+python -m evals.run --mode live           # explicitly uses Gemini and may cost money
+```
+
+`evals/cases.json` versions answerability, citation, injection, and scope fixtures.
+Reports include per-case outcomes, dataset SHA-256, model ID, and context limits;
+a failed case makes the command exit nonzero. Replay mode uses scripted outputs
+and byte counts to test contracts. Its pass count is **not a model-quality
+metric**. Live mode skips the two deliberately malformed model-output fixtures,
+fails infrastructure errors, and checks exact expected excerpts on the remaining
+small fixture set. Live model behavior is not deterministic even at temperature
+zero, and a provider may update a model behind an ID. No live results are claimed.
+Dependencies, including transitive dependencies, are pinned for repeatable setup.
+
+The original `tests/` files still exercise the legacy path and may call external
+services; the commands above intentionally select the new offline suite.
+
+For Docker, build with `docker build -f Dockerfile.backend -t research-backend .`
+and run with `docker run --rm -p 127.0.0.1:8000:8000 --env GEMINI_API_KEY research-backend`.
+The existing Dockerfile continues to run Streamlit.
+
+## Change map
+
+- `backend/models.py`: strict API, tool-call, citation, and trace contracts.
+- `backend/store.py`: bounded text ingestion, stable source spans, lexical retrieval.
+- `backend/engine.py`: tool routing, prompt budgeting, quote validation, abstention.
+- `backend/gemini.py`: lazy provider access, token counting, output cap.
+- `backend/api.py`: upload and question HTTP endpoints with isolated app state.
+- `evals/` and the new tests: offline behavior checks and explicit live evaluation.
+
+---
+
+## Legacy application
+
 🧠 Autonomous AI Research & Implementation Assistant
 
 This project is an agentic AI system that can understand a user query, decide how to solve it, and dynamically use multiple specialized agents to produce a final answer.
